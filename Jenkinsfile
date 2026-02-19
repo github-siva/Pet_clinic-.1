@@ -1,82 +1,42 @@
+
 pipeline {
-    agent any 
-    
-    tools{
-        jdk 'jdk11'
-        maven 'maven3'
-    }
-    
-    environment {
-        SCANNER_HOME=tool 'sonar-scanner'
-    }
-    
+   
+    agent any
+   
     stages{
-        
-        stage("Git Checkout"){
+        stage('checkout-->clone'){
             steps{
-                git branch: 'main', changelog: false, poll: false, url: 'https://github.com/jaiswaladi246/Petclinic.git'
+                git branch: 'feature-2026.02.19', url: 'https://github.com/github-siva/Pet_clinic-.1.git'
             }
         }
-        
-        stage("Compile"){
+       
+        stage('Build'){
             steps{
-                sh "mvn clean compile"
+            bat 'mvn install'
+        }
+        }
+        stage('Test'){
+            steps{
+                bat 'mvn test'
             }
         }
-        
-         stage("Test Cases"){
+stage('published the test results'){
             steps{
-                sh "mvn test"
+               junit 'target/*surefire-reports/*.xml'
             }
         }
-        
-        stage("Sonarqube Analysis "){
+       
+        stage('Generated the Artifacts'){
             steps{
-                withSonarQubeEnv('sonar-server') {
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Petclinic \
-                    -Dsonar.java.binaries=. \
-                    -Dsonar.projectKey=Petclinic '''
-    
-                }
+                archiveArtifacts artifacts: 'target/*.war', followSymlinks: false
             }
         }
-        
-        stage("OWASP Dependency Check"){
+
+         stage('deploy'){
             steps{
-                dependencyCheck additionalArguments: '--scan ./ --format HTML ', odcInstallation: 'DP'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-            }
-        }
-        
-         stage("Build"){
-            steps{
-                sh " mvn clean install"
-            }
-        }
-        
-        stage("Docker Build & Push"){
-            steps{
-                script{
-                   withDockerRegistry(credentialsId: '58be877c-9294-410e-98ee-6a959d73b352', toolName: 'docker') {
-                        
-                        sh "docker build -t image1 ."
-                        sh "docker tag image1 adijaiswal/pet-clinic123:latest "
-                        sh "docker push adijaiswal/pet-clinic123:latest "
-                    }
-                }
-            }
-        }
-        
-        stage("TRIVY"){
-            steps{
-                sh " trivy image adijaiswal/pet-clinic123:latest"
-            }
-        }
-        
-        stage("Deploy To Tomcat"){
-            steps{
-                sh "cp  /var/lib/jenkins/workspace/CI-CD/target/petclinic.war /opt/apache-tomcat-9.0.65/webapps/ "
+                deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'tomcat_credentials', path: '', url: 'http://localhost:8080/')], contextPath: 'tomcat_integrating- pet_clinic.1_pipeline', war: 'target/*.war'
             }
         }
     }
 }
+ 
